@@ -103,4 +103,5 @@ while True:
         bot.polling(none_stop=True, interval=0, timeout=20)
     except Exception as e:
         print(f"⚠️ حدث خطأ في الاتصال (Polling Error): {e}")
+
         time.sleep(5) # انتظار 5 ثواني قبل إعادة المحاولة
