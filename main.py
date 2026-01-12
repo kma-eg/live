@@ -4,104 +4,88 @@ import os
 import time
 from keep_alive import keep_alive
 
-# --- إعدادات البوت والمتغيرات ---
-# بنجيب التوكن والآيدي من إعدادات السيرفر (Environment Variables)
+# --- المتغيرات ---
 BOT_TOKEN = os.getenv('TOKEN')
 ADMIN_ID = os.getenv('ADMIN_ID')
 
-# التأكد من وجود التوكن
-if not BOT_TOKEN:
-    print("خطأ: لم يتم العثور على التوكن. تأكد من إضافته في متغيرات البيئة في Render.")
-    exit()
-
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# إعدادات التحميل (yt-dlp) - أساسية
-ydl_opts_base = {
+# إعدادات التحميل (مع الكوكيز)
+ydl_opts = {
     'format': 'best',
     'noplaylist': True,
-    # هنا ممكن نضيف مسار ملف الكوكيز لو رفعناه على GitHub
-    # 'cookiefile': 'cookies.txt', 
+    'cookiefile': 'cookies.txt',  # هنا السر: لازم الملف ده يكون موجود
+    'outtmpl': '%(title)s.%(ext)s',
+    'quiet': True,
 }
 
-# --- أوامر البوت ---
-
+# --- رسالة الترحيب ---
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    welcome_text = """
-أهلاً بك يا صديقي! 👋
-أنا بوت لتحميل الفيديوهات من أغلب منصات التواصل الاجتماعي (يوتيوب، فيسبوك، إنستجرام، وغيرها).
+    bot.reply_to(message, "👋 أهلاً يا بطل!\n\n🎥 ابعتلي أي رابط فيديو (يوتيوب، فيسبوك، إنستجرام) وهحملهولك.\n🔍 أو ابعتلي أي كلمة للبحث عنها في يوتيوب.")
 
-✅ **فقط أرسل لي رابط الفيديو وسأقوم بتحميله لك.**
-
-🔍 *قريباً: خدمة البحث عن الفيديوهات مباشرة.*
-    """
-    bot.reply_to(message, welcome_text)
-
-# --- معالج الروابط (التحميل المباشر) - شغال تمام ✅ ---
+# --- دالة التحميل من الرابط ---
 def is_url(message):
-    # دالة بسيطة للتأكد إن الرسالة فيها رابط
     return "http" in message.text
 
 @bot.message_handler(func=is_url)
-def handle_video_link(message):
+def handle_link(message):
     url = message.text
     chat_id = message.chat.id
-    msg_wait = bot.reply_to(message, "⏳ جاري معالجة الرابط... لحظات من فضلك.")
+    msg = bot.reply_to(message, "⏳ جاري التحميل... استنى لحظة.")
 
     try:
-        # محاولة استخراج معلومات الفيديو ورابط التحميل المباشر
-        with yt_dlp.YoutubeDL(ydl_opts_base) as ydl:
-            info_dict = ydl.extract_info(url, download=False)
-            video_url = info_dict.get('url', None)
-            video_title = info_dict.get('title', 'فيديو بدون عنوان')
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
             
-            if not video_url:
-                bot.edit_message_text("❌ عذراً، لم أتمكن من استخراج رابط الفيديو المباشر.", chat_id, msg_wait.message_id)
-                return
-
-            bot.edit_message_text(f"✅ تم العثور على الفيديو: {video_title}\nجاري الإرسال...", chat_id, msg_wait.message_id)
+            bot.edit_message_text("✅ تم التحميل! جاري الرفع...", chat_id, msg.message_id)
             
-            # إرسال الفيديو للمستخدم
-            bot.send_video(chat_id, video_url, caption=f"🎬 تم التحميل بواسطة: @{bot.get_me().username}")
-            bot.delete_message(chat_id, msg_wait.message_id)
+            with open(filename, 'rb') as video:
+                bot.send_video(chat_id, video, caption=f"🎬 {info.get('title', 'فيديو')}")
+            
+            os.remove(filename) # مسح الملف بعد الإرسال لتوفير المساحة
+            bot.delete_message(chat_id, msg.message_id)
 
     except Exception as e:
-        # في حالة حدوث خطأ
-        error_message = str(e)
-        print(f"Error downloading link: {error_message}") # طباعة الخطأ في السجلات
-        bot.edit_message_text("❌ حدث خطأ أثناء محاولة تحميل الفيديو. قد يكون الرابط غير مدعوم أو محمي.", chat_id, msg_wait.message_id)
-        
-        # إبلاغ الأدمن بالخطأ (اختياري)
+        bot.edit_message_text(f"❌ حدث خطأ: اليوتيوب رفض الاتصال.\nتأكد من ملف cookies.txt", chat_id, msg.message_id)
         if ADMIN_ID:
-             try:
-                 bot.send_message(ADMIN_ID, f"🚨 خطأ في البوت:\nمستخدم: {message.from_user.first_name}\nرابط: {url}\nالخطأ: {error_message}")
-             except:
-                 pass
+            bot.send_message(ADMIN_ID, f"🚨 خطأ:\n{e}")
 
-
-# --- معالج البحث (رسائل عادية ليست روابط) - ❌ يحتاج تصليح ---
-@bot.message_handler(func=lambda message: not is_url(message))
+# --- دالة البحث (الكود الجديد) ---
+@bot.message_handler(func=lambda m: True)
 def handle_search(message):
-    # هذا الجزء هو الذي لا يعمل حالياً ويحتاج إلى إصلاح
-    # سنقوم فقط بإرسال رسالة مؤقتة حتى نصلحه
-    bot.reply_to(message, "🔍 خدمة البحث قيد الصيانة حالياً، سيتم تفعيلها قريباً جداً! \nالرجاء إرسال روابط مباشرة فقط الآن.")
-    
-    # (هنا كان المفروض يكون كود البحث اللي بيسبب المشكلة)
-    # print(f"Search attempt for: {message.text}")
+    query = message.text
+    chat_id = message.chat.id
+    msg = bot.reply_to(message, f"🔍 جاري البحث عن: {query}...")
 
-
-# --- تشغيل البوت ---
-
-# تشغيل سيرفر الـ Flask في الخلفية
-keep_alive()
-
-# تشغيل البوت في حلقة لا نهائية (Polling)
-print("✅ البوت يعمل الآن...")
-while True:
     try:
-        bot.polling(none_stop=True, interval=0, timeout=20)
-    except Exception as e:
-        print(f"⚠️ حدث خطأ في الاتصال (Polling Error): {e}")
+        # إعدادات خاصة للبحث (أول نتيجة فقط)
+        search_opts = ydl_opts.copy()
+        search_opts['default_search'] = 'ytsearch1'
+        
+        with yt_dlp.YoutubeDL(search_opts) as ydl:
+            info = ydl.extract_info(query, download=True)
+            
+            # في البحث، النتيجة بتكون داخل قائمة 'entries'
+            if 'entries' in info:
+                video_info = info['entries'][0]
+            else:
+                video_info = info
 
-        time.sleep(5) # انتظار 5 ثواني قبل إعادة المحاولة
+            filename = ydl.prepare_filename(video_info)
+            
+            bot.edit_message_text(f"✅ لقيت الفيديو: {video_info.get('title')}\nجاري الرفع...", chat_id, msg.message_id)
+            
+            with open(filename, 'rb') as video:
+                bot.send_video(chat_id, video, caption=f"🔎 نتيجة البحث: {query}")
+            
+            os.remove(filename)
+            bot.delete_message(chat_id, msg.message_id)
+
+    except Exception as e:
+        bot.edit_message_text("❌ لم يتم العثور على نتائج أو حدث خطأ.", chat_id, msg.message_id)
+
+# --- التشغيل ---
+keep_alive()
+bot.infinity_polling(skip_pending=True)
