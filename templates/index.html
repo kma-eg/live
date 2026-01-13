@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+       <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Downloader & Search</title>
+    <title>Video App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -13,9 +13,7 @@
             margin: 0;
             padding: 0;
             font-family: 'Cairo', sans-serif;
-            background: linear-gradient(-45deg, #1e1e2f, #2a0845, #1e1e2f, #0f0c29);
-            background-size: 400% 400%;
-            animation: gradientBG 15s ease infinite;
+            background: linear-gradient(135deg, #1e1e2f 0%, #0f0c29 100%);
             color: #fff;
             height: 100vh;
             display: flex;
@@ -25,75 +23,66 @@
             overflow: hidden;
         }
 
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
         .container {
             background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(20px);
+            backdrop-filter: blur(15px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 25px;
-            padding: 30px 20px;
+            padding: 20px;
             width: 85%;
             max-width: 400px;
             text-align: center;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
 
-        /* أزرار التبديل */
+        /* أزرار التبديل (Tabs) */
         .tabs {
             display: flex;
-            justify-content: center;
             background: rgba(0,0,0,0.3);
             border-radius: 15px;
             padding: 5px;
             margin-bottom: 20px;
         }
-        .tab-btn {
+        .tab {
             flex: 1;
             padding: 10px;
-            border: none;
-            background: transparent;
-            color: #aaa;
-            font-family: 'Cairo', sans-serif;
-            font-weight: bold;
-            border-radius: 12px;
+            text-align: center;
             cursor: pointer;
+            border-radius: 12px;
+            color: #aaa;
             transition: 0.3s;
+            font-weight: bold;
         }
-        .tab-btn.active {
-            background: linear-gradient(90deg, #d53369, #daae51);
+        .tab.active {
+            background: linear-gradient(90deg, #ff00cc, #333399);
             color: #fff;
-            box-shadow: 0 4px 15px rgba(213, 51, 105, 0.4);
+            box-shadow: 0 4px 15px rgba(255, 0, 204, 0.3);
         }
 
-        .header-icon { font-size: 50px; margin-bottom: 10px; color: #daae51; }
-        h2 { margin: 0 0 5px; }
+        h2 { margin: 0 0 10px; font-size: 22px; }
         
-        .input-group { position: relative; margin-bottom: 20px; }
         input {
             width: 100%;
             padding: 15px;
             border-radius: 15px;
             border: 2px solid rgba(255,255,255,0.1);
-            background: rgba(0,0,0,0.3);
+            background: rgba(0,0,0,0.2);
             color: white;
+            font-size: 16px;
             font-family: 'Cairo', sans-serif;
             outline: none;
             box-sizing: border-box;
             text-align: center;
+            margin-bottom: 20px;
         }
-        input:focus { border-color: #d53369; }
+        input:focus { border-color: #ff00cc; }
 
-        .main-btn {
+        button {
             width: 100%;
             padding: 15px;
             border: none;
             border-radius: 15px;
-            background: linear-gradient(90deg, #d53369, #daae51);
+            background: linear-gradient(90deg, #ff00cc, #333399);
             color: white;
             font-size: 18px;
             font-weight: bold;
@@ -101,34 +90,30 @@
             cursor: pointer;
             transition: 0.3s;
         }
-        .main-btn:active { transform: scale(0.95); }
+        button:active { transform: scale(0.95); }
 
+        #status { margin-top: 15px; font-size: 14px; min-height: 20px; }
         .hidden { display: none; }
-        #status { margin-top: 15px; font-size: 13px; color: #ffcc00; height: 20px;}
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div class="header-icon"><i class="fas fa-robot"></i></div>
-        
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('download')">📥 تحميل رابط</button>
-            <button class="tab-btn" onclick="switchTab('search')">🔍 بحث يوتيوب</button>
+            <div class="tab active" onclick="switchTab('dl')">📥 تحميل</div>
+            <div class="tab" onclick="switchTab('sr')">🔍 بحث</div>
         </div>
 
-        <div id="downloadSection">
-            <div class="input-group">
-                <input type="text" id="linkInput" placeholder="ضع رابط الفيديو هنا...">
-            </div>
-            <button onclick="sendData('download')" class="main-btn">بدء التحميل 🚀</button>
+        <div id="dl-section">
+            <h2>ضع الرابط هنا</h2>
+            <input type="text" id="linkInput" placeholder="رابط فيديو (يوتيوب، فيسبوك..)">
+            <button onclick="sendData('download')">بدء التحميل 🚀</button>
         </div>
 
-        <div id="searchSection" class="hidden">
-            <div class="input-group">
-                <input type="text" id="searchInput" placeholder="اكتب اسم الفيديو للبحث...">
-            </div>
-            <button onclick="sendData('search')" class="main-btn" style="background: linear-gradient(90deg, #333399, #ff00cc);">بحث الآن 🔎</button>
+        <div id="sr-section" class="hidden">
+            <h2>بحث يوتيوب</h2>
+            <input type="text" id="searchInput" placeholder="اكتب اسم الفيديو...">
+            <button onclick="sendData('search')">بحث الآن 🔎</button>
         </div>
 
         <div id="status"></div>
@@ -138,21 +123,21 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        function switchTab(tab) {
-            const dlSec = document.getElementById('downloadSection');
-            const srSec = document.getElementById('searchSection');
-            const btns = document.querySelectorAll('.tab-btn');
+        function switchTab(mode) {
+            const dl = document.getElementById('dl-section');
+            const sr = document.getElementById('sr-section');
+            const tabs = document.querySelectorAll('.tab');
 
-            if(tab === 'download') {
-                dlSec.classList.remove('hidden');
-                srSec.classList.add('hidden');
-                btns[0].classList.add('active');
-                btns[1].classList.remove('active');
+            if (mode === 'dl') {
+                dl.classList.remove('hidden');
+                sr.classList.add('hidden');
+                tabs[0].classList.add('active');
+                tabs[1].classList.remove('active');
             } else {
-                dlSec.classList.add('hidden');
-                srSec.classList.remove('hidden');
-                btns[0].classList.remove('active');
-                btns[1].classList.add('active');
+                dl.classList.add('hidden');
+                sr.classList.remove('hidden');
+                tabs[0].classList.remove('active');
+                tabs[1].classList.add('active');
             }
         }
 
@@ -170,27 +155,29 @@
             }
 
             statusDiv.innerText = "جاري المعالجة...";
-            if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-
+            
+            // إرسال البيانات للسيرفر
             fetch('/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: type, text: value, user_id: userId })
+                body: JSON.stringify({
+                    type: type, // نوع الطلب (تحميل أو بحث)
+                    text: value,
+                    user_id: userId
+                })
             })
             .then(response => response.json())
             .then(data => {
                 if(data.status === "ok") {
-                    statusDiv.innerText = "تم الإرسال ✅";
-                    if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    setTimeout(() => tg.close(), 1000);
+                    statusDiv.innerText = "✅ تم الإرسال! راجع البوت.";
+                    setTimeout(() => tg.close(), 1500);
                 } else {
-                    statusDiv.innerText = "❌ حدث خطأ";
+                    statusDiv.innerText = "❌ حدث خطأ.";
                 }
             })
-            .catch(error => {
-                statusDiv.innerText = "❌ خطأ في الاتصال";
-            });
+            .catch(err => { statusDiv.innerText = "❌ خطأ في الاتصال"; });
         }
     </script>
 </body>
 </html>
+         
