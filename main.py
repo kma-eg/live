@@ -23,14 +23,15 @@ def receive_data():
     user_id = data.get('user_id')
 
     if not user_id:
-        return jsonify({'status': 'error', 'msg': 'User ID missing'})
+        return jsonify({'status': 'error'})
 
-    # توجيه الطلب حسب النوع
     if req_type == 'search':
-        # تشغيل البحث في الخلفية
         Thread(target=process_web_search, args=(user_id, text)).start()
     else:
-        # تشغيل التحميل في الخلفية
+        # لو تحميل (نتأكد من الصيانة)
+        if ("youtube.com" in text or "youtu.be" in text) and MAINTENANCE_STATUS['youtube']:
+             # هنا ممكن نرجع رد للصيانة لو حبيت، بس حالياً هنمشيه
+             pass
         Thread(target=process_url_flow, args=(user_id, text)).start()
     
     return jsonify({'status': 'ok'})
@@ -42,14 +43,13 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# --- 2. المتغيرات والتوكن ---
+# --- 2. الإعدادات ---
 BOT_TOKEN = os.environ.get('TOKEN')
 ADMIN_ID = os.environ.get('ADMIN_ID')
-APP_URL = "https://live-ykzi.onrender.com" # الرابط الجديد بتاعك
+APP_URL = "https://live-ykzi.onrender.com"
 
-# تم إلغاء صيانة يوتيوب كما طلبت
 MAINTENANCE_STATUS = {
-    'youtube': False, 
+    'youtube': False, # شغال
     'facebook': False,
     'instagram': False,
     'tiktok': False
@@ -71,14 +71,15 @@ BLOCKED_KEYWORDS = [
 ]
 
 SUCCESS_MSGS = [
-    "عاش! تم قفش الرابط بنجاح",
+    "عاش! الرابط وصل",
     "ثواني ويكون عندك",
-    "جاري التجهيز يا وحش",
+    "جاري التجهيز",
     "طلبك وصل",
     "انت تؤمر"
 ]
 
-# --- 3. دوال النقاط والهدايا (جديد) ---
+# --- 3. الدوال ---
+
 def get_user_data(user_id):
     if not os.path.exists(rewards_file):
         with open(rewards_file, "w") as f: json.dump({}, f)
@@ -98,14 +99,13 @@ def claim_daily_gift(user_id):
     if data[uid]["last_claimed"] == today:
         return False, 0, data[uid]["points"]
     
-    gift = random.randint(1, 3) # هدية عشوائية من 1 لـ 3
+    gift = random.randint(1, 3)
     data[uid]["points"] += gift
     data[uid]["last_claimed"] = today
     
     with open(rewards_file, "w") as f: json.dump(data, f)
     return True, gift, data[uid]["points"]
 
-# --- 4. دوال المساعدة ---
 def is_safe_content(text):
     text = text.lower()
     for word in BLOCKED_KEYWORDS:
@@ -123,7 +123,6 @@ def save_and_notify_admin(message):
     
     if user_id not in users:
         with open(users_file, "a") as f: f.write(user_id + "\n")
-        # إشعار للأدمن بدون نجوم
         if ADMIN_ID:
             msg = (f"مستخدم جديد انضم للبوت\nالاسم: {first_name}\n"
                    f"اليوزر: @{username}\nالأيدي: {user_id}")
@@ -142,78 +141,59 @@ def check_sub(user_id):
     except: return True
     return False
 
-# مراقبة الحظر
-@bot.my_chat_member_handler()
-def handle_status_change(message):
-    if not ADMIN_ID: return
-    user = message.from_user
-    new_status = message.new_chat_member.status
-    old_status = message.old_chat_member.status
-    
-    if new_status == "kicked":
-        bot.send_message(ADMIN_ID, f"قام مستخدم بحظر البوت\nالاسم: {user.first_name}\nالأيدي: {user.id}")
-    elif new_status == "member" and old_status == "kicked":
-        bot.send_message(ADMIN_ID, f"قام مستخدم بإعادة استخدام البوت\nالاسم: {user.first_name}\nالأيدي: {user.id}")
+# --- 4. المعالجة ---
 
-# --- 5. منطق التحميل والبحث ---
-
-# معالجة البحث القادم من الويب
 def process_web_search(chat_id, query):
-    bot.send_message(chat_id, f"🔎 جاري البحث عن: {query} ...")
+    bot.send_message(chat_id, f"🔎 جاري البحث عن: {query}")
     try:
-        # استخدام yt-dlp للبحث السريع
         with yt_dlp.YoutubeDL({'quiet': True, 'noplaylist': True}) as ydl:
+            # بحث عن 5 نتائج
             results = ydl.extract_info(f"ytsearch5:{query}", download=False)['entries']
         
         if not results:
-            bot.send_message(chat_id, "❌ لم يتم العثور على نتائج.")
+            bot.send_message(chat_id, "❌ لا توجد نتائج")
             return
 
         markup = types.InlineKeyboardMarkup(row_width=1)
         for vid in results:
             title = vid.get('title', 'Video')
             url = vid.get('webpage_url')
-            # زرار لكل نتيجة، لما يدوس عليه يبدأ تحميله
+            # زرار لكل فيديو
             markup.add(types.InlineKeyboardButton(f"🎬 {title}", callback_data=f"web_dl|{url}"))
             
-        bot.send_message(chat_id, "👇 اختر الفيديو للتحميل:", reply_markup=markup)
+        bot.send_message(chat_id, "👇 اختر للتحميل:", reply_markup=markup)
 
     except Exception as e:
-        bot.send_message(chat_id, "❌ حدث خطأ أثناء البحث.")
+        bot.send_message(chat_id, "❌ خطأ في البحث")
 
-# معالجة رابط التحميل
 def process_url_flow(chat_id, url):
     if not is_safe_content(url):
         bot.send_message(chat_id, "🚫 محتوى محظور")
         return
 
-    # فحص الصيانة لليوتيوب
     if ("youtube.com" in url or "youtu.be" in url) and MAINTENANCE_STATUS['youtube']:
-        bot.send_message(chat_id, "⚠️ يوتيوب في الصيانة حالياً")
+        bot.send_message(chat_id, "⚠️ يوتيوب في الصيانة")
         return
 
-    msg = bot.send_message(chat_id, f"🔎 وصلني الرابط\n{url}\nجاري الفحص...")
+    msg = bot.send_message(chat_id, f"🔎 الرابط وصل\nجاري الفحص...")
     
     try:
-        # إضافة الكوكيز لو موجودة
         ydl_opts = {'quiet': True, 'no_warnings': True, 'ignoreerrors': True, 'nocheckcertificate': True}
-        if os.path.exists('cookies.txt'):
-            ydl_opts['cookiefile'] = 'cookies.txt'
+        if os.path.exists('cookies.txt'): ydl_opts['cookiefile'] = 'cookies.txt'
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
         
         if not info:
-            bot.edit_message_text("❌ الرابط لا يعمل أو خاص", chat_id=msg.chat.id, message_id=msg.message_id)
+            bot.edit_message_text("❌ الرابط لا يعمل", chat_id=msg.chat.id, message_id=msg.message_id)
             return
 
         title = info.get('title', 'Link')
         thumbnail = info.get('thumbnail')
-        duration = info.get('duration') 
+        duration = info.get('duration')
         linked_title = f"[{title}]({url})"
         motivational_msg = random.choice(SUCCESS_MSGS)
 
-        # لو فيديو
         if duration and duration > 0:
             markup = types.InlineKeyboardMarkup(row_width=2)
             markup.add(
@@ -233,8 +213,6 @@ def process_url_flow(chat_id, url):
                 bot.send_photo(chat_id, thumbnail, caption=caption_text, parse_mode="Markdown", reply_markup=markup)
             else:
                 bot.send_message(chat_id, caption_text, parse_mode="Markdown", reply_markup=markup)
-        
-        # لو صور (Instagram/Facebook Posts)
         else:
             bot.edit_message_text(f"{motivational_msg}\n🖼️ جاري تحميل الصور...", chat_id=msg.chat.id, message_id=msg.message_id)
             
@@ -258,35 +236,30 @@ def process_url_flow(chat_id, url):
                 bot.delete_message(chat_id, msg.message_id)
 
     except Exception as e:
-        # إرسال رسالة عامة للمستخدم
-        bot.edit_message_text("❌ فشل التحميل (تأكد من الرابط أو حاول لاحقاً)", chat_id=msg.chat.id, message_id=msg.message_id)
-        # إرسال الخطأ بالتفصيل للأدمن فقط
+        bot.edit_message_text("❌ فشل التحميل", chat_id=msg.chat.id, message_id=msg.message_id)
+        # إرسال الخطأ للأدمن فقط
         if ADMIN_ID:
-            err_msg = f"⚠️ تقرير خطأ:\nالمستخدم: {chat_id}\nالرابط: {url}\nالخطأ: {str(e)}"
-            bot.send_message(ADMIN_ID, err_msg)
+            bot.send_message(ADMIN_ID, f"⚠️ خطأ تحميل:\nالمستخدم: {chat_id}\nالرابط: {url}\nالخطأ: {str(e)}")
 
-# --- 6. الأوامر والواجهة ---
+# --- 5. الهاندلرز ---
+
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     save_and_notify_admin(message)
     data, uid = get_user_data(message.from_user.id)
-    points = data[uid]["points"]
     
     welcome_text = (
         f"أهلاً بك يا {message.from_user.first_name} 👋\n\n"
-        f"💰 نقاطك الحالية: {points}\n\n"
+        f"💰 نقاطك الحالية: {data[uid]['points']}\n\n"
         "أنا بوت التحميل الشامل 🤖\n"
-        "حمل فيديوهاتك بسهولة وبدون علامة مائية\n\n"
+        "حمل من يوتيوب، تيك توك، فيسبوك، إنستجرام\n"
         "اضغط بالأسفل لفتح التطبيق 👇"
     )
 
     markup = types.InlineKeyboardMarkup()
     web_app_info = types.WebAppInfo(APP_URL)
     markup.add(types.InlineKeyboardButton(text="📱 اضغط للتحميل والبحث (Web App)", web_app=web_app_info))
-    
-    # زر الهدية اليومية
     markup.add(types.InlineKeyboardButton("🎁 هدية يومية", callback_data="daily_gift"))
-    
     markup.add(types.InlineKeyboardButton("📢 قناة المطور", url="https://t.me/+8o0uI_JLmYwwZWJk"))
     
     if str(ADMIN_ID) and str(message.from_user.id) == str(ADMIN_ID):
@@ -307,66 +280,52 @@ def handle_message(message):
     if "http" in message.text:
         Thread(target=process_url_flow, args=(message.chat.id, message.text)).start()
     else:
-        # البحث العادي من الشات
+        # بحث من الشات مباشرة
         process_web_search(message.chat.id, message.text)
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     data = call.data
     
-    # الهدية اليومية
     if data == "daily_gift":
         success, gift, total = claim_daily_gift(call.from_user.id)
         if success:
             bot.answer_callback_query(call.id, f"🎉 مبروك كسبت {gift} نقطة\nرصيدك: {total}", show_alert=True)
         else:
-            bot.answer_callback_query(call.id, "⚠️ أخذت هديتك اليوم تعال بكرة", show_alert=True)
+            bot.answer_callback_query(call.id, "⚠️ أخذت الهدية النهاردة", show_alert=True)
         return
 
-    # استقبال التحميل من نتيجة البحث في الويب
     if data.startswith("web_dl|"):
         url = data.split("|")[1]
         process_url_flow(call.message.chat.id, url)
         return
 
-    # لوحة التحكم
     if data == "admin_main":
         if str(call.from_user.id) != str(ADMIN_ID): return
         
-        user_count = 0
+        count = 0
         if os.path.exists(users_file):
-            with open(users_file, "r") as f: user_count = len(f.readlines())
+            with open(users_file, "r") as f: count = len(f.readlines())
         
-        stats_msg = (
-            "👮‍♂️ لوحة التحكم الخاصة بالمطور\n\n"
-            f"👥 عدد مستخدمي البوت: {user_count}\n"
-            "📈 البوت يعمل بكفاءة"
-        )
         bot.answer_callback_query(call.id)
-        bot.send_message(call.message.chat.id, stats_msg)
+        bot.send_message(call.message.chat.id, f"👮‍♂️ لوحة التحكم\n👥 عدد المستخدمين: {count}")
         return
 
     if data == "cancel":
         bot.delete_message(call.message.chat.id, call.message.message_id)
         return
 
-    # معالجة التحميل (الجودة)
     if data.startswith("dl|"):
         mode = data.split("|")[1]
         
-        # محاولة استخراج الرابط الأصلي
         original_url = ""
         if call.message.caption_entities:
             for entity in call.message.caption_entities:
-                if entity.type == "text_link":
-                    original_url = entity.url
-                    break
-        
-        if not original_url: # fallback
+                if entity.type == "text_link": original_url = entity.url; break
+        if not original_url and call.message.caption:
              import re
-             if call.message.caption:
-                 urls = re.findall(r'(https?://[^\s]+)', call.message.caption)
-                 if urls: original_url = urls[0]
+             urls = re.findall(r'(https?://[^\s]+)', call.message.caption)
+             if urls: original_url = urls[0]
 
         if not original_url:
             bot.answer_callback_query(call.id, "❌ الرابط مفقود")
@@ -392,7 +351,7 @@ def callback_query(call):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(original_url, download=True)
                 filename = ydl.prepare_filename(info)
-                caption = f"✅ BOT  @Kma_tbot"
+                caption = f"✅ @kareemcv"
                 
                 with open(filename, 'rb') as f:
                     if mode == "audio": bot.send_audio(call.message.chat.id, f, caption=caption)
@@ -403,7 +362,7 @@ def callback_query(call):
 
         except Exception as e:
             bot.send_message(call.message.chat.id, "❌ فشل التحميل")
-            if ADMIN_ID: bot.send_message(ADMIN_ID, f"Error DL: {str(e)}")
+            if ADMIN_ID: bot.send_message(ADMIN_ID, f"⚠️ خطأ:\n{str(e)}")
 
 if __name__ == "__main__":
     keep_alive()
