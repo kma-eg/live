@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Downloader & Search</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(-45deg, #1e1e2f, #2a0845, #1e1e2f, #0f0c29);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 25px;
+            padding: 30px 20px;
+            width: 85%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+        }
+
+        /* أزرار التبديل */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            padding: 5px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            color: #aaa;
+            font-family: 'Cairo', sans-serif;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .tab-btn.active {
+            background: linear-gradient(90deg, #d53369, #daae51);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(213, 51, 105, 0.4);
+        }
+
+        .header-icon { font-size: 50px; margin-bottom: 10px; color: #daae51; }
+        h2 { margin: 0 0 5px; }
+        
+        .input-group { position: relative; margin-bottom: 20px; }
+        input {
+            width: 100%;
+            padding: 15px;
+            border-radius: 15px;
+            border: 2px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.3);
+            color: white;
+            font-family: 'Cairo', sans-serif;
+            outline: none;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        input:focus { border-color: #d53369; }
+
+        .main-btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 15px;
+            background: linear-gradient(90deg, #d53369, #daae51);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            font-family: 'Cairo', sans-serif;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .main-btn:active { transform: scale(0.95); }
+
+        .hidden { display: none; }
+        #status { margin-top: 15px; font-size: 13px; color: #ffcc00; height: 20px;}
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header-icon"><i class="fas fa-robot"></i></div>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('download')">📥 تحميل رابط</button>
+            <button class="tab-btn" onclick="switchTab('search')">🔍 بحث يوتيوب</button>
+        </div>
+
+        <div id="downloadSection">
+            <div class="input-group">
+                <input type="text" id="linkInput" placeholder="ضع رابط الفيديو هنا...">
+            </div>
+            <button onclick="sendData('download')" class="main-btn">بدء التحميل 🚀</button>
+        </div>
+
+        <div id="searchSection" class="hidden">
+            <div class="input-group">
+                <input type="text" id="searchInput" placeholder="اكتب اسم الفيديو للبحث...">
+            </div>
+            <button onclick="sendData('search')" class="main-btn" style="background: linear-gradient(90deg, #333399, #ff00cc);">بحث الآن 🔎</button>
+        </div>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        function switchTab(tab) {
+            const dlSec = document.getElementById('downloadSection');
+            const srSec = document.getElementById('searchSection');
+            const btns = document.querySelectorAll('.tab-btn');
+
+            if(tab === 'download') {
+                dlSec.classList.remove('hidden');
+                srSec.classList.add('hidden');
+                btns[0].classList.add('active');
+                btns[1].classList.remove('active');
+            } else {
+                dlSec.classList.add('hidden');
+                srSec.classList.remove('hidden');
+                btns[0].classList.remove('active');
+                btns[1].classList.add('active');
+            }
+        }
+
+        function sendData(type) {
+            const statusDiv = document.getElementById("status");
+            const userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
+            let value = "";
+
+            if (type === 'download') {
+                value = document.getElementById("linkInput").value;
+                if (!value) { statusDiv.innerText = "⚠️ ضع الرابط أولاً"; return; }
+            } else {
+                value = document.getElementById("searchInput").value;
+                if (!value) { statusDiv.innerText = "⚠️ اكتب كلمة للبحث"; return; }
+            }
+
+            statusDiv.innerText = "جاري المعالجة...";
+            if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+
+            fetch('/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: type, text: value, user_id: userId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === "ok") {
+                    statusDiv.innerText = "تم الإرسال ✅";
+                    if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    setTimeout(() => tg.close(), 1000);
+                } else {
+                    statusDiv.innerText = "❌ حدث خطأ";
+                }
+            })
+            .catch(error => {
+                statusDiv.innerText = "❌ خطأ في الاتصال";
+            });
+        }
+    </script>
+</body>
+</html>
