@@ -35,7 +35,7 @@
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
 
-        /* أزرار التبديل (Tabs) */
+        /* التبويبات */
         .tabs {
             display: flex;
             background: rgba(0,0,0,0.3);
@@ -52,6 +52,7 @@
             color: #aaa;
             transition: 0.3s;
             font-weight: bold;
+            font-size: 14px;
         }
         .tab.active {
             background: linear-gradient(90deg, #ff00cc, #333399);
@@ -59,8 +60,9 @@
             box-shadow: 0 4px 15px rgba(255, 0, 204, 0.3);
         }
 
-        h2 { margin: 0 0 10px; font-size: 22px; }
+        h2 { margin: 0 0 10px; font-size: 20px; }
         
+        /* تحسين شكل الإدخال */
         input {
             width: 100%;
             padding: 15px;
@@ -74,8 +76,12 @@
             box-sizing: border-box;
             text-align: center;
             margin-bottom: 20px;
+            box-shadow: none; /* إزالة الظل المزعج */
         }
-        input:focus { border-color: #ff00cc; }
+        input:focus { 
+            border-color: #ff00cc; 
+            background: rgba(0,0,0,0.4);
+        }
 
         button {
             width: 100%;
@@ -92,6 +98,18 @@
         }
         button:active { transform: scale(0.95); }
 
+        .gift-box {
+            font-size: 50px;
+            margin-bottom: 10px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
+            40% {transform: translateY(-20px);}
+            60% {transform: translateY(-10px);}
+        }
+
         #status { margin-top: 15px; font-size: 14px; min-height: 20px; }
         .hidden { display: none; }
     </style>
@@ -102,18 +120,26 @@
         <div class="tabs">
             <div class="tab active" onclick="switchTab('dl')">📥 تحميل</div>
             <div class="tab" onclick="switchTab('sr')">🔍 بحث</div>
+            <div class="tab" onclick="switchTab('gift')">🎁 هدية</div>
         </div>
 
         <div id="dl-section">
             <h2>ضع الرابط هنا</h2>
-            <input type="text" id="linkInput" placeholder="رابط فيديو (يوتيوب، فيسبوك..)">
+            <input type="text" id="linkInput" placeholder="رابط فيديو..." autocomplete="off">
             <button onclick="sendData('download')">بدء التحميل 🚀</button>
         </div>
 
         <div id="sr-section" class="hidden">
             <h2>بحث يوتيوب</h2>
-            <input type="text" id="searchInput" placeholder="اكتب اسم الفيديو...">
+            <input type="text" id="searchInput" placeholder="اسم الفيديو..." autocomplete="off">
             <button onclick="sendData('search')">بحث الآن 🔎</button>
+        </div>
+
+        <div id="gift-section" class="hidden">
+            <div class="gift-box">🎁</div>
+            <h2>الهدية اليومية</h2>
+            <p style="color:#aaa; font-size:13px;">اضغط للحصول على نقاط مجانية</p>
+            <button onclick="sendData('gift')" style="background: linear-gradient(90deg, #f12711, #f5af19);">استلم الهدية 🎉</button>
         </div>
 
         <div id="status"></div>
@@ -124,21 +150,19 @@
         tg.expand();
 
         function switchTab(mode) {
-            const dl = document.getElementById('dl-section');
-            const sr = document.getElementById('sr-section');
+            const secs = ['dl', 'sr', 'gift'];
             const tabs = document.querySelectorAll('.tab');
-
-            if (mode === 'dl') {
-                dl.classList.remove('hidden');
-                sr.classList.add('hidden');
-                tabs[0].classList.add('active');
-                tabs[1].classList.remove('active');
-            } else {
-                dl.classList.add('hidden');
-                sr.classList.remove('hidden');
-                tabs[0].classList.remove('active');
-                tabs[1].classList.add('active');
-            }
+            
+            secs.forEach((s, i) => {
+                if (s === mode) {
+                    document.getElementById(s + '-section').classList.remove('hidden');
+                    tabs[i].classList.add('active');
+                } else {
+                    document.getElementById(s + '-section').classList.add('hidden');
+                    tabs[i].classList.remove('active');
+                }
+            });
+            document.getElementById("status").innerText = "";
         }
 
         function sendData(type) {
@@ -149,30 +173,29 @@
             if (type === 'download') {
                 value = document.getElementById("linkInput").value;
                 if (!value) { statusDiv.innerText = "⚠️ ضع الرابط أولاً"; return; }
-            } else {
+            } else if (type === 'search') {
                 value = document.getElementById("searchInput").value;
                 if (!value) { statusDiv.innerText = "⚠️ اكتب كلمة للبحث"; return; }
             }
 
             statusDiv.innerText = "جاري المعالجة...";
             
-            // إرسال البيانات للسيرفر
             fetch('/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: type, // نوع الطلب (تحميل أو بحث)
-                    text: value,
-                    user_id: userId
-                })
+                body: JSON.stringify({ type: type, text: value, user_id: userId })
             })
             .then(response => response.json())
             .then(data => {
                 if(data.status === "ok") {
-                    statusDiv.innerText = "✅ تم الإرسال! راجع البوت.";
-                    setTimeout(() => tg.close(), 1500);
+                    if (type === 'gift') {
+                        statusDiv.innerText = data.msg; // رسالة الهدية
+                    } else {
+                        statusDiv.innerText = "✅ تم الإرسال!";
+                        setTimeout(() => tg.close(), 1500);
+                    }
                 } else {
-                    statusDiv.innerText = "❌ حدث خطأ.";
+                    statusDiv.innerText = "⚠️ " + (data.msg || "حدث خطأ");
                 }
             })
             .catch(err => { statusDiv.innerText = "❌ خطأ في الاتصال"; });
@@ -180,4 +203,4 @@
     </script>
 </body>
 </html>
-         
+     
