@@ -351,7 +351,7 @@ def callback_query(call):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(original_url, download=True)
                 filename = ydl.prepare_filename(info)
-                caption = f"✅ @kareemcv"
+                caption = f"✅  Bot @Kma_tbot"
                 
                 with open(filename, 'rb') as f:
                     if mode == "audio": bot.send_audio(call.message.chat.id, f, caption=caption)
@@ -367,3 +367,4 @@ def callback_query(call):
 if __name__ == "__main__":
     keep_alive()
     bot.infinity_polling(allowed_updates=['message', 'callback_query', 'my_chat_member'])
+
