@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kareem Bot App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        /* إصلاح مشكلة الخلفية مع الكيبورد */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Cairo', sans-serif;
+            min-height: 100vh; /* fallback */
+            min-height: 100dvh; /* dynamic height for mobile */
+            background: linear-gradient(135deg, #1e1e2f 0%, #2a0845 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto; /* السماح بالسكرول لو الكيبورد غطى الشاشة */
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 25px 20px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            margin: 20px auto;
+        }
+
+        .header-icon { 
+            font-size: 45px; 
+            margin-bottom: 15px; 
+            color: #daae51;
+            text-shadow: 0 0 10px rgba(218, 174, 81, 0.5);
+        }
+
+        /* تنسيق التابات */
+        .tabs {
+            display: flex;
+            background: rgba(0,0,0,0.25);
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 25px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            color: #ccc;
+            font-family: 'Cairo', sans-serif;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 14px;
+        }
+        .tab-btn.active {
+            background: #d53369;
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(213, 51, 105, 0.4);
+        }
+
+        /* حقول الإدخال */
+        .input-group { margin-bottom: 20px; }
+        input {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.2);
+            color: white;
+            font-family: 'Cairo', sans-serif;
+            font-size: 16px; /* يمنع الزووم التلقائي في آيفون */
+            outline: none;
+            box-sizing: border-box;
+            text-align: center;
+            transition: 0.3s;
+        }
+        input:focus { 
+            border-color: #d53369; 
+            background: rgba(0,0,0,0.4);
+        }
+
+        .main-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(90deg, #d53369, #daae51);
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            font-family: 'Cairo', sans-serif;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .main-btn:active { transform: scale(0.98); }
+
+        /* قسم الهدية */
+        .gift-box {
+            animation: float 3s ease-in-out infinite;
+            font-size: 60px;
+            margin: 20px 0;
+            cursor: pointer;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .hidden { display: none; }
+        #status { margin-top: 15px; font-size: 14px; color: #ffcc00; min-height: 20px; white-space: pre-line;}
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header-icon"><i class="fas fa-robot"></i></div>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('download')">📥 تحميل</button>
+            <button class="tab-btn" onclick="switchTab('search')">🔍 بحث</button>
+            <button class="tab-btn" onclick="switchTab('gift')">🎁 هدية</button>
+        </div>
+
+        <div id="downloadSection">
+            <div class="input-group">
+                <input type="text" id="linkInput" placeholder="ضع رابط الفيديو هنا..">
+            </div>
+            <button onclick="sendData('download')" class="main-btn">بدء التحميل 🚀</button>
+        </div>
+
+        <div id="searchSection" class="hidden">
+            <div class="input-group">
+                <input type="text" id="searchInput" placeholder="اسم الفيديو..">
+            </div>
+            <button onclick="sendData('search')" class="main-btn" style="background: linear-gradient(90deg, #333399, #ff00cc);">بحث الآن 🔎</button>
+        </div>
+
+        <div id="giftSection" class="hidden">
+            <p style="color: #ccc; font-size: 14px;">اضغط على الصندوق لاستلام هديتك اليومية</p>
+            <div class="gift-box" onclick="sendData('gift')">🎁</div>
+            <button onclick="sendData('gift')" class="main-btn" style="background: linear-gradient(90deg, #11998e, #38ef7d);">استلام النقاط 💰</button>
+        </div>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); 
+        // محاولة فرض الألوان لتتناسب مع السيم
+        tg.setHeaderColor('#1e1e2f');
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('downloadSection').classList.add('hidden');
+            document.getElementById('searchSection').classList.add('hidden');
+            document.getElementById('giftSection').classList.add('hidden');
+            
+            // تفعيل الزر والقسم
+            if (tab === 'download') {
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+                document.getElementById('downloadSection').classList.remove('hidden');
+            } else if (tab === 'search') {
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                document.getElementById('searchSection').classList.remove('hidden');
+            } else {
+                document.querySelectorAll('.tab-btn')[2].classList.add('active');
+                document.getElementById('giftSection').classList.remove('hidden');
+            }
+            // مسح حالة الستاتس لما يغير التاب
+            document.getElementById("status").innerText = "";
+        }
+
+        function sendData(type) {
+            const statusDiv = document.getElementById("status");
+            const userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
+            let value = "";
+
+            if (!userId) {
+                // للتجربة لو فاتح من المتصفح العادي (اختياري)
+                // userId = "123456"; 
+                statusDiv.innerText = "❌ افتح التطبيق من تيليجرام";
+                return;
+            }
+
+            if (type === 'download') {
+                value = document.getElementById("linkInput").value;
+                if (!value) { statusDiv.innerText = "⚠️ ضع الرابط أولاً"; return; }
+            } else if (type === 'search') {
+                value = document.getElementById("searchInput").value;
+                if (!value) { statusDiv.innerText = "⚠️ اكتب كلمة للبحث"; return; }
+            }
+
+            statusDiv.innerText = "⏳ جاري الاتصال...";
+            if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+
+            fetch('/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: type, text: value, user_id: userId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === "ok") {
+                    if(type === 'gift') {
+                         statusDiv.innerText = data.msg; // عرض رسالة الهدية
+                         if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    } else {
+                        statusDiv.innerText = "✅ تم الإرسال للبوت";
+                        if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                        setTimeout(() => tg.close(), 1500);
+                    }
+                } else {
+                    statusDiv.innerText = data.msg || "❌ حدث خطأ";
+                    if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+                }
+            })
+            .catch(error => {
+                statusDiv.innerText = "❌ خطأ في الاتصال بالسيرفر";
+            });
+        }
+    </script>
+</body>
+</html>
