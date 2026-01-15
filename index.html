@@ -16,15 +16,14 @@
             padding: 0;
             font-family: 'Cairo', sans-serif;
             background: linear-gradient(135deg, #1e1e2f 0%, #0f0c29 100%);
-            background-attachment: fixed; /* تثبيت الخلفية عشان الكيبورد */
+            background-attachment: fixed;
             color: #fff;
-            /* استخدام dvh بدل vh عشان الموبايل */
             min-height: 100dvh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            overflow-y: auto; /* السماح بالسكرول لو الشاشة صغرت */
+            overflow-y: auto;
         }
 
         .header-bar {
@@ -37,7 +36,6 @@
             z-index: 100;
         }
 
-        /* زر الهدية الجديد */
         .gift-btn {
             background: rgba(255, 215, 0, 0.2);
             border: 1px solid #ffd700;
@@ -50,11 +48,22 @@
             align-items: center;
             gap: 5px;
             animation: pulse 2s infinite;
+            font-size: 14px;
         }
+        
+        .points-display { 
+            font-size: 14px; 
+            color: #eee; 
+            font-weight: bold; 
+            background: rgba(0,0,0,0.3);
+            padding: 5px 10px;
+            border-radius: 15px;
+        }
+
         @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
         }
 
         .container {
@@ -67,7 +76,7 @@
             max-width: 400px;
             text-align: center;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-            margin-top: 50px; /* مسافة عشان الهيدر */
+            margin-top: 60px;
         }
 
         .tabs {
@@ -93,6 +102,8 @@
             color: #fff;
             box-shadow: 0 4px 15px rgba(255, 0, 204, 0.3);
         }
+
+        h3 { margin: 0 0 15px 0; font-size: 18px; }
 
         input {
             width: 100%;
@@ -127,15 +138,14 @@
 
         #status { margin-top: 15px; font-size: 14px; min-height: 20px; }
         .hidden { display: none; }
-        .points-display { font-size: 14px; color: #eee; }
     </style>
 </head>
 <body>
 
     <div class="header-bar">
-        <div class="points-display"><i class="fas fa-coins"></i> نقاطك: <span id="userPoints">...</span></div>
+        <div class="points-display"><i class="fas fa-coins"></i> <span id="userPoints">...</span></div>
         <div class="gift-btn" onclick="claimGift()">
-            <i class="fas fa-gift"></i> هدية يومية
+            <i class="fas fa-gift"></i> هدية
         </div>
     </div>
 
@@ -164,7 +174,7 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // جلب النقاط عند الفتح
+        // 1. جلب النقاط عند فتح التطبيق
         window.onload = function() {
             const userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
             if(userId) {
@@ -175,14 +185,25 @@
                 })
                 .then(res => res.json())
                 .then(data => {
-                    document.getElementById('userPoints').innerText = data.points;
+                    if(data.points !== undefined) {
+                        document.getElementById('userPoints').innerText = data.points;
+                    }
                 });
             }
         };
 
+        // 2. دالة استلام الهدية
         function claimGift() {
             const statusDiv = document.getElementById("status");
             const userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
+            
+            if(!userId) {
+                statusDiv.innerText = "❌ لا يمكن التعرف على المستخدم";
+                return;
+            }
+
+            // تأثير بصري
+            statusDiv.innerText = "🎁 جاري استلام الهدية...";
             
             fetch('/submit', {
                 method: 'POST',
@@ -204,6 +225,7 @@
             });
         }
 
+        // 3. التبديل بين التبويبات
         function switchTab(mode) {
             const dl = document.getElementById('dl-section');
             const sr = document.getElementById('sr-section');
@@ -222,12 +244,13 @@
             }
         }
 
-        function sendData(type) {
+        // 4. إرسال طلب التحميل أو البحث
+        function sendData(reqType) {
             const statusDiv = document.getElementById("status");
             const userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
             let value = "";
 
-            if (type === 'download') {
+            if (reqType === 'download') {
                 value = document.getElementById("linkInput").value;
                 if (!value) { statusDiv.innerText = "⚠️ ضع الرابط أولاً"; return; }
             } else {
@@ -235,13 +258,16 @@
                 if (!value) { statusDiv.innerText = "⚠️ اكتب كلمة للبحث"; return; }
             }
 
-            statusDiv.innerText = "جاري المعالجة...";
+            statusDiv.innerText = "⏳ جاري المعالجة...";
+            statusDiv.style.color = "#fff";
             
+            // إرسال البيانات للسيرفر
+            // لاحظ: بنبعت 'text' مش 'url' عشان يتوافق مع main.py
             fetch('/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    type: type,
+                    type: reqType,
                     text: value,
                     user_id: userId
                 })
@@ -250,13 +276,18 @@
             .then(data => {
                 if(data.status === "ok") {
                     statusDiv.innerText = "✅ تم الإرسال! راجع البوت.";
+                    statusDiv.style.color = "#00e676";
                     if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                     setTimeout(() => tg.close(), 1500);
                 } else {
                     statusDiv.innerText = "❌ حدث خطأ.";
+                    statusDiv.style.color = "#ff4d4d";
                 }
             })
-            .catch(err => { statusDiv.innerText = "❌ خطأ في الاتصال"; });
+            .catch(err => { 
+                statusDiv.innerText = "❌ خطأ في الاتصال"; 
+                statusDiv.style.color = "#ff4d4d";
+            });
         }
     </script>
 </body>
