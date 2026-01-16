@@ -25,24 +25,26 @@ def receive_data():
     if not user_id:
         return jsonify({'status': 'error', 'msg': 'User ID missing'})
 
-    # معالجة الهدية من الموقع
+    # 1. معالجة الهدية من الموقع
     if req_type == 'gift':
         success, gift, total = claim_daily_gift(user_id)
         if success:
-            return jsonify({'status': 'ok', 'msg': f'مبروك كسبت {gift} نقطة', 'new_points': total})
+            return jsonify({'status': 'ok', 'msg': f'مبروك! كسبت {gift} نقطة', 'new_points': total})
         else:
             return jsonify({'status': 'error', 'msg': 'أخذت الهدية اليوم!'})
 
-    # جلب النقاط للعرض
+    # 2. جلب النقاط للعرض
     if req_type == 'get_points':
         d, _ = get_user_data(user_id)
-        return jsonify({'points': d[str(user_id)]['points']})
+        # تأكد إن النقاط موجودة
+        points = d.get(str(user_id), {}).get('points', 0)
+        return jsonify({'points': points})
 
-    # البحث والتحميل
+    # 3. البحث والتحميل
     if req_type == 'search':
         Thread(target=process_web_search, args=(user_id, text)).start()
     else:
-        # فحص الصيانة لليوتيوب
+        # فحص الصيانة
         if ("youtube.com" in text or "youtu.be" in text) and MAINTENANCE_STATUS['youtube']:
              pass 
         Thread(target=process_url_flow, args=(user_id, text)).start()
@@ -56,10 +58,9 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# --- إعدادات البوت ---
+# --- الإعدادات ---
 BOT_TOKEN = os.environ.get('TOKEN')
 ADMIN_ID = os.environ.get('ADMIN_ID')
-# 👇 الرابط الجديد أهو يا غالي
 APP_URL = "https://live-ykzi.onrender.com"
 
 MAINTENANCE_STATUS = {
@@ -264,9 +265,7 @@ def process_url_flow(chat_id, url):
                 bot.delete_message(chat_id, msg.message_id)
 
     except Exception as e:
-        # إبلاغ المستخدم بفشل عام
         bot.edit_message_text("❌ فشل التحميل", chat_id=msg.chat.id, message_id=msg.message_id)
-        # إرسال تفاصيل الخطأ للأدمن فقط
         if ADMIN_ID:
             err_msg = f"⚠️ تقرير خطأ:\nالمستخدم: {chat_id}\nالرابط: {url}\nالخطأ: {str(e)}"
             bot.send_message(ADMIN_ID, err_msg)
@@ -321,9 +320,16 @@ def callback_query(call):
         process_url_flow(call.message.chat.id, url)
         return
 
-    # لوحة التحكم
+    # --- لوحة التحكم (تم الإصلاح هنا) ---
     if data == "admin_main":
         if str(call.from_user.id) != str(ADMIN_ID): return
+        
+        # ⚠️ الحل السحري: مسح الرسالة القديمة (الصورة) وإرسال رسالة جديدة
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except:
+            pass
+
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
             types.InlineKeyboardButton("📊 الإحصائيات", callback_data="admin_stats"),
@@ -331,9 +337,11 @@ def callback_query(call):
         )
         markup.add(types.InlineKeyboardButton("🔒 اشتراك إجباري", callback_data="admin_ch"))
         markup.add(types.InlineKeyboardButton("❌ إغلاق", callback_data="cancel"))
-        bot.edit_message_text("👮‍♂️ **لوحة التحكم الرئيسية**\nاختر قسماً:", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+        
+        bot.send_message(call.message.chat.id, "👮‍♂️ **لوحة التحكم الرئيسية**\nاختر قسماً:", reply_markup=markup)
         return
 
+    # باقي الأزرار
     if data == "admin_stats":
         count = 0
         if os.path.exists(users_file):
